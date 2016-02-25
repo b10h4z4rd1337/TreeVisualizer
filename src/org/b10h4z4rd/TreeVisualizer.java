@@ -24,7 +24,7 @@ public class TreeVisualizer {
     private TreeVisualizer() {
         JFrame frame = new JFrame("TreeVisualizer");
         treeVisualizerPanel = new TreeVisualizerPanel();
-        frame.setContentPane(treeVisualizerPanel);
+        frame.setContentPane(new JScrollPane(treeVisualizerPanel));
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);
@@ -40,41 +40,56 @@ public class TreeVisualizer {
         treeVisualizerPanel.treeChanged();
     }
 
-    private static int calcTreeHeight(IElement element) {
-        int left = 0, right = 0;
-
-        if (element.getLeftNode() == null && element.getRightNode() == null) {
-            return 0;
-        }
-
-        if (element.getLeftNode() != null) {
-            left = calcTreeHeight(element.getLeftNode()) + 1;
-        }
-
-        if (element.getRightNode() != null) {
-            right = calcTreeHeight(element.getRightNode()) + 1;
-        }
-
-        return Math.max(left, right);
-    }
-
     private class TreeVisualizerPanel extends JPanel {
 
-        public static final int BOX_HEIGHT = 20, BOX_WIDHT = 40, BOX_HEIGHT_DIFF = 10, BOX_WIDHT_DIFF = 20;
-        private int windowHeight = 100, windowWidth = 100;
+        public static final int BOX_HEIGHT = 20, BOX_WIDHT = 40, BOX_HEIGHT_DIFF = 10, BOX_WIDHT_DIFF = 5;
+        private int windowHeight = 500, windowWidth = 500;
+        private int treeHeight;
+        private double[] diffs;
 
         public TreeVisualizerPanel() {
             setPreferredSize(new Dimension(windowWidth, windowHeight));
         }
 
+        private int calcTreeHeight(IElement element) {
+            int left = 0, right = 0;
+
+            if (element.getData() == null) {
+                return 0;
+            }
+
+            if (element.getLeftNode() != null) {
+                left = calcTreeHeight(element.getLeftNode()) + 1;
+            }
+
+            if (element.getRightNode() != null) {
+                right = calcTreeHeight(element.getRightNode()) + 1;
+            }
+
+            return Math.max(left, right);
+        }
+
         public void treeChanged() {
-            int treeHeight = TreeVisualizer.calcTreeHeight(TreeVisualizer.this.tree.getRoot());
-            windowHeight = 40 + treeHeight * BOX_HEIGHT + (treeHeight - 2) * 10;
-            windowWidth = (int) (40 + Math.pow(2, treeHeight - 1) * BOX_WIDHT + Math.pow(2, treeHeight - 2) * BOX_WIDHT_DIFF);
-            setPreferredSize(new Dimension(windowWidth, windowHeight));
-            Window window = SwingUtilities.getWindowAncestor(this);
-            window.pack();
-            repaint();
+            treeHeight = calcTreeHeight(TreeVisualizer.this.tree.getRoot());
+
+            if (treeHeight > 1) {
+                diffs = new double[treeHeight - 1];
+
+                diffs[treeHeight - 2] = BOX_WIDHT_DIFF;
+
+                for (int i = treeHeight - 3; i >= 0; i--) {
+                    diffs[i] += 2 * BOX_WIDHT + 2 * diffs[i + 1];
+                }
+
+
+                windowHeight = 80 + treeHeight * BOX_HEIGHT + treeHeight * 10;
+                windowWidth = Math.abs(getWidth() / 2 - calcRightBound(tree.getRoot().getRightNode(), getWidth() / 2, 0)) +
+                        Math.abs(getWidth() / 2 - calcLeftBound(tree.getRoot().getLeftNode(), getWidth() / 2, 0)) + 80;
+                setPreferredSize(new Dimension(windowWidth, windowHeight));
+                //Window window = SwingUtilities.getWindowAncestor(this);
+                //window.pack();
+                repaint();
+            }
         }
 
         @Override
@@ -82,12 +97,14 @@ public class TreeVisualizer {
             g.clearRect(0, 0, getWidth(), getHeight());
 
             g.setColor(Color.black);
-            if (TreeVisualizer.this.tree != null && TreeVisualizer.this.tree.getRoot().getData() != null) {
-                paintFromNode(getWidth() / 2, 20 + BOX_HEIGHT / 2, getWidth() / 2, TreeVisualizer.this.tree.getRoot(), g);
+            if (treeHeight > 1) {
+                if (TreeVisualizer.this.tree != null && TreeVisualizer.this.tree.getRoot().getData() != null) {
+                    paintFromNode(getWidth() / 2, 20 + BOX_HEIGHT / 2, 0, TreeVisualizer.this.tree.getRoot(), g);
+                }
             }
         }
 
-        private void paintFromNode(int x, int y, int diff, IElement node, Graphics g) {
+        private void paintFromNode(int x, int y, int level, IElement node, Graphics g) {
             int boxX = x - BOX_WIDHT / 2, boxY = y - BOX_HEIGHT / 2;
             g.drawRect(boxX, boxY, BOX_WIDHT, BOX_HEIGHT);
             String toDraw = node.getData().getData().toString();
@@ -95,18 +112,40 @@ public class TreeVisualizer {
             int newY = y + BOX_HEIGHT + BOX_HEIGHT_DIFF;
             if (node.getLeftNode() != null) {
                 if (node.getLeftNode().getData() != null) {
-                    int newX = x - BOX_WIDHT_DIFF / 2 - BOX_WIDHT / 2 - diff / 2;
-                    g.drawLine(x, y + BOX_HEIGHT / 2, newX, y + BOX_HEIGHT / 2 + BOX_HEIGHT_DIFF);
-                    paintFromNode(newX, newY, diff / 2, node.getLeftNode(), g);
+                    double newX = x - diffs[level] / 2 - BOX_WIDHT / 2;
+                    g.drawLine(x, y + BOX_HEIGHT / 2, (int) newX, y + BOX_HEIGHT / 2 + BOX_HEIGHT_DIFF);
+                    paintFromNode((int) newX, newY, level + 1, node.getLeftNode(), g);
                 }
             }
             if (node.getRightNode() != null) {
                 if (node.getRightNode().getData() != null) {
-                    int newX = x + BOX_WIDHT_DIFF / 2 + BOX_WIDHT / 2 + diff / 2;
-                    g.drawLine(x, y + BOX_HEIGHT / 2, newX, y + BOX_HEIGHT / 2 + BOX_HEIGHT_DIFF);
-                    paintFromNode(newX, newY, diff / 2, node.getRightNode(), g);
+                    double newX = x + diffs[level] / 2 + BOX_WIDHT / 2;
+                    g.drawLine(x, y + BOX_HEIGHT / 2, (int) newX, y + BOX_HEIGHT / 2 + BOX_HEIGHT_DIFF);
+                    paintFromNode((int) newX, newY, level + 1, node.getRightNode(), g);
                 }
             }
+        }
+
+        private int calcLeftBound(IElement element, int width, int level) {
+            if (element.getData() == null)
+                return width;
+
+            width -= BOX_WIDHT_DIFF / 2 - BOX_WIDHT / 2 - diffs[level] / 2;
+            if (element.getLeftNode() != null)
+                return calcLeftBound(element.getLeftNode(), width, level + 1);
+            else
+                return width;
+        }
+
+        private int calcRightBound(IElement element, int width, int level) {
+            if (element.getData() == null)
+                return width;
+
+            width += BOX_WIDHT_DIFF / 2 + BOX_WIDHT / 2 + diffs[level] / 2;
+            if (element.getRightNode() != null)
+                return calcLeftBound(element.getRightNode(), width, level + 1);
+            else
+                return width;
         }
     }
 }

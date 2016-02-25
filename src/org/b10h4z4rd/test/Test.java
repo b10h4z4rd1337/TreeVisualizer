@@ -17,7 +17,7 @@ public class Test
         TreeVisualizer visualizer = TreeVisualizer.getVisualizer();
         visualizer.setTree(baum);
 
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 10; i++) {
             baum.einfuegen(new Zahldaten((int)(Math.random() * Short.MAX_VALUE)));
         }
     }
